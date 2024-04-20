@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model User {
+  id                        String             @id @default(cuid())
+  name                      String
+  email                     String?            @unique
+  emailVerified             DateTime?
+  image                     String?
+  accounts                  Account[]
+  documents                 Document[]
+  messages                  Message[]
+  collaboratorateddocuments Collaborator[]
+  createdAt                 DateTime           @default(now())
+  feedbacks                 Feedback[]
+  flashcardAttempts         FlashcardAttempt[]
+}
+
+model Document {
+  // unique for url might be dumb => if someone uploads using url
+  url           String         @unique
+  id            String         @id @default(cuid())
+  title         String
+  owner         User           @relation(fields: [ownerId], references: [id])
+  highlights    Highlight[]
+  collaborators Collaborator[]
+  ownerId       String
+  // notes seems to be stored on yjs, so no need to store it here
+  note          String?        @db.Text
+  messages      Message[]
+  isVectorised  Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+
+  // false if user adds document by url
+  isUploaded Boolean @default(true)
+
+  // lastscrolledposition => but has to be different for each user
+  // create new table storing lastscrolledposition,
+  // along with userPreferences table which can be optional, if it exists, then it overrides users default(the one linked to user table) preferences (less priority)
+
+  // pdf first page url => cloudinary provides this.
+  flashcards Flashcard[]
+}
+
+enum CollaboratorRole {
+  EDITOR
+  VIEWER
+  OWNER
+}
+
+model Collaborator {
+  id         String           @id @default(cuid())
+  role       CollaboratorRole
+  document   Document         @relation(fields: [documentId], references: [id])
+  documentId String
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([documentId, userId])
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  text          String
+  createdAt     DateTime @default(now())
+  user          User?    @relation(fields: [userId], references: [id])
+  userId        String?
+  document      Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId    String
+  // this is redundant, check for userId
+  isUserMessage Boolean
+}
+
+enum HighlightTypeEnum {
+  TEXT
+  IMAGE
+}
+
+model Highlight {
+  id         String            @id @default(cuid())
+  // imageUrl   String?  @db.Text
+  // text       String?  @db.Text
+  type       HighlightTypeEnum
+  document   Document          @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId String
+  createdAt  DateTime          @default(now())
+
+  boundingRectangle Cordinate? @relation("boundingRectangle")
+
+  rectangles Cordinate[] @relation("rectangles")
+
+  pageNumber Int?
+}
+
+model Cordinate {
+  id     String @id @default(cuid())
+  x1     Float
+  y1     Float
+  x2     Float
+  y2     Float
+  width  Float
+  height Float
+
+  pageNumber Int?
+
+  highlightedRectangle   Highlight? @relation("rectangles", fields: [highlightedRectangleId], references: [id], onDelete: Cascade)
+  highlightedRectangleId String?
+
+  highlightedBoundingRectangle   Highlight? @relation("boundingRectangle", fields: [highlightedBoundingRectangleId], references: [id], onDelete: Cascade)
+  highlightedBoundingRectangleId String?    @unique
+}
+
+model Feedback {
+  id            String   @id @default(cuid())
+  message       String   @db.Text
+  // from the form
+  contact_email String?
+  type          String
+  createdAt     DateTime @default(now())
+  user          User?    @relation(fields: [userId], references: [id])
+  userId        String?
+}
+
+model Flashcard {
+  id                String             @id @default(cuid())
+  question          String
+  answer            String
+  document          Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId        String
+  createdAt         DateTime           @default(now())
+  flashcardAttempts FlashcardAttempt[]
+}
+
+model FlashcardAttempt {
+  id          String    @id @default(cuid())
+  flashcard   Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+  flashcardId String
+  user        User      @relation(fields: [userId], references: [id])
+  userId      String
+  // option to remove the qn => maybe a hasMemorised boolean
+  createdAt   DateTime  @default(now())
+
+  // what user responded
+  userResponse String
+
+  // what user got right
+  correctResponse String?
+
+  // what user got wrong
+  incorrectResponse String?
+
+  // more info about the answer
+  moreInfo String?
+}
