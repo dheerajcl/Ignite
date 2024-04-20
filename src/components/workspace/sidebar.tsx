@@ -2,6 +2,7 @@ import Chat from "@/components/chat";
 import Editor from "@/components/editor";
 import Flashcards from "@/components/flashcard";
 import DragDrop from "@/components/Im";
+import Pedia from "@/components/Wiki";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
@@ -14,7 +15,7 @@ import { ClientSideSuspense } from "@liveblocks/react";
 import { saveAs } from "file-saver";
 import { RoomProvider } from "liveblocks.config";
 import Link from "next/link";
-import { AlbumIcon, Download, Layers, MessagesSquareIcon, Camera } from "lucide-react";
+import { AlbumIcon, Download, Layers, MessagesSquareIcon, Image, Globe } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import InviteCollab from "./invite-collab-modal";
@@ -41,9 +42,15 @@ const TABS = [
   {
     value: "new-feature", // Define a new tab value
     tooltip: "Chat with Images", // Define a tooltip for the new tab
-    icon: <Camera size={20} />, // Define an icon for the new tab
+    icon: <Image size={20} />, // Define an icon for the new tab
     isNew: false,
-},
+  },
+  {
+    value: "new-feature2", // Define a new tab value
+    tooltip: "Chat with Images", // Define a tooltip for the new tab
+    icon: <Globe size={20} />, // Define an icon for the new tab
+    isNew: false,
+  },
 ];
 
 // const ExploreButton = () => (
@@ -126,22 +133,7 @@ const Sidebar = ({
                 </TabsTrigger>
               </CustomTooltip>
             ))}
-            {/* {TABS.map((item) => (
-              <CustomTooltip content={item.tooltip} key={item.value}>
-                <TabsTrigger value={item.value} className="relative">
-                  {item.isNew && (
-                    <div className="absolute -bottom-2 -right-2">
-                      <Badge className="bg-blue-400 p-[0.05rem] text-[0.5rem] hover:bg-blue-500">
-                        NEW
-                      </Badge>
-                    </div>
-                  )}
-                  {item.icon}
-                </TabsTrigger>
-              </CustomTooltip>
-            ))} */}
             <div className="p-2">
-              {/* <ExploreButton /> */}
             </div>
           </TabsList>
           <div className="flex items-center gap-1">
@@ -199,6 +191,11 @@ const Sidebar = ({
             value: "new-feature",
             tw: "p-2 pb-0 break-words border-stone-200 bg-white sm:rounded-lg sm:border sm:shadow-lg h/[calc(100vh-3.5rem)] w/full overflow-scroll",
             children: <DragDrop />
+          },
+          {
+            value: "new-feature2",
+            tw: "p-2 pb-0 break-words border-stone-200 bg-white sm:rounded-lg sm:border sm:shadow-lg h/[calc(100vh-3.5rem)] w/full overflow-scroll",
+            children: <Pedia />
           },
         ].map((item) => (
           <TabsContent
