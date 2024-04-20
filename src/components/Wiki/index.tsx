@@ -8,7 +8,7 @@ const NewTabComponent = () => {
     return (
         <div className="flex h-screen w-full flex-col gap-2 overflow-hidden min-h-screen">
             <div className="px-4 py-2">
-                <h2 className="text-2xl font-bold text-gray-800">Chat with Images</h2>
+                <h2 className="text-2xl font-bold text-gray-800">Research with Wikipedia</h2>
             </div>
 
             <div
@@ -17,7 +17,7 @@ const NewTabComponent = () => {
             >
                 <iframe
                     src="https://wikichat1.streamlit.app/?embed=true" /* Update this URL to your desired iframe source */
-                    title="Research with Wikipedia"
+                    
                     className="w-full h-screen p-8 rounded-lg shadow-lg border border-gray-200 overflow-hidden"
                     frameBorder="0"
                     allowFullScreen
