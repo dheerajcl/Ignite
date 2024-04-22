@@ -10,6 +10,7 @@ import { type AppType } from "next/app";
 import { useRouter } from "next/router";
 import { SEO } from "../../next-seo.config";
 import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const MyApp: AppType<{ session: Session | null }> = ({
   Component,
@@ -32,6 +33,7 @@ const MyApp: AppType<{ session: Session | null }> = ({
       )}
       <Toaster />
       <Analytics />
+      <SpeedInsights />
     </SessionProvider>
   );
 };

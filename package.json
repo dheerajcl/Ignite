@@ -46,6 +46,7 @@
     "@trpc/server": "^10.34.0",
     "@uploadthing/react": "^6.2.4",
     "@vercel/analytics": "^1.2.2",
+    "@vercel/speed-insights": "^1.0.10",
     "ai": "^2.2.35",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
