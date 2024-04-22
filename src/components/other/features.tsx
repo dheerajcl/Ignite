@@ -22,12 +22,12 @@ const features = [
   },
   {
     title: "Generate Flashcards",
-    imageUrl: "/features/flashcard.png",
+    imageUrl: "/features/flashcard.gif",
     description: "Answer the flashcard, and get feedbacks on what you missed.",
   },
   {
     title: "Collaborate with your team",
-    imageUrl: "/features/flashcard.gif",
+    imageUrl: "/features/collab.gif",
     description: "With real-time updates.",
   },
   {
