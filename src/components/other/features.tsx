@@ -7,18 +7,18 @@ import { useEffect, useRef } from "react";
 const features = [
   {
     title: "Annotate your notes w. ease",
-    imageUrl: "/features/Annotate.png",
+    imageUrl: "/features/annotation.gif",
     description:
       "To create area highlight hold ⌥ Option key (Alt), then click and drag.",
   },
   {
     title: "Take notes with a notion like editor",
-    imageUrl: "/features/notion.png",
+    imageUrl: "/features/editor.gif",
     description: "With export to Markdown.",
   },
   {
     title: "Ask the chatbot anything pdf related",
-    imageUrl: "/features/chat.png",
+    imageUrl: "/features/chatbot.gif",
   },
   {
     title: "Generate Flashcards",
@@ -27,12 +27,12 @@ const features = [
   },
   {
     title: "Collaborate with your team",
-    imageUrl: "/features/collaborate.png",
+    imageUrl: "/features/flashcard.gif",
     description: "With real-time updates.",
   },
   {
     title: "AI-powered autocompletion",
-    imageUrl: "/features/ai_auto.png",
+    imageUrl: "/features/completion.gif",
     description: "Add '++' to the end of a sentence to autocomplete.",
   },
 ];
