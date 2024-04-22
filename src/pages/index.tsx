@@ -18,7 +18,7 @@ export default function Home() {
         <div className="absolute bottom-auto left-auto right-0 top-0 h-[500px] w-[500px] -translate-x-[30%] translate-y-[20%] rounded-full bg-[rgba(173,109,244,0.5)] opacity-60 blur-[80px]" />
       </div>
       <div className="px-4 py-2 lg:px-16">
-        <div className="h-screen ">
+        <div className="h-200 ">
           <HeroSection />
         </div>
 
@@ -39,7 +39,7 @@ export default function Home() {
 const HeroSection = () => {
   return (
     <SlideUpWhenVisible>
-      <div className="mt-40 flex flex-col items-center justify-center gap-2 py-4 lg:py-8">
+      <div className="mt-20 flex flex-col items-center justify-center gap-2 py-4 lg:py-8">
         <a
           className="group mx-auto flex max-w-fit items-center justify-center space-x-2 overflow-hidden rounded-full border border-gray-200 bg-white px-6 py-2 shadow-[inset_10px_-50px_94px_0_rgb(199,199,199,0.1)] backdrop-blur transition-all hover:border-gray-300 hover:bg-white/50"
           target="_blank"
