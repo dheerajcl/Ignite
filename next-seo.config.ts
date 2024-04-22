@@ -10,7 +10,7 @@ export const SEO = {
     images: [
       // { url: "https://ignite.vercel.app/logo.png" },
       {
-        url: "https://ignite3-0.vercel.app/fireball.png",
+        url: "https://igniteit.vercel.app/fireball.png",
         width: 800,
         height: 600,
         alt: "Og Image",
@@ -34,7 +34,7 @@ export const SEO = {
   additionalLinkTags: [
     {
       rel: "icon",
-      href: "https://ignite3-0.vercel.app/favicon.ico",
+      href: "https://igniteit.vercel.app/favicon.ico",
     },
   ],
 };

@@ -9,6 +9,7 @@ import { DefaultSeo } from "next-seo";
 import { type AppType } from "next/app";
 import { useRouter } from "next/router";
 import { SEO } from "../../next-seo.config";
+import { Analytics } from '@vercel/analytics/react';
 
 const MyApp: AppType<{ session: Session | null }> = ({
   Component,
@@ -30,6 +31,7 @@ const MyApp: AppType<{ session: Session | null }> = ({
         </main>
       )}
       <Toaster />
+      <Analytics />
     </SessionProvider>
   );
 };
