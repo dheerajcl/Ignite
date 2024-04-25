@@ -14,7 +14,7 @@ export const vectoriseDocument = async (fileUrl: string, newFileId: string) => {
   // better to add pagecount to db, so that "5 page" limit can be checked easily.
   const pageCount = pageLevelDocs.length;
 
-  if (pageCount > 5) {
+  if (pageCount > 15) {
     throw new Error(
       "Document to be vectorised can have at max 5 pages for now.",
     );
