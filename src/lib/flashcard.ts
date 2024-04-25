@@ -11,9 +11,9 @@ export const generateFlashcards = async (fileUrl: string) => {
   // better to add pagecount to db, so that "5 page" limit can be checked easily.
   const pageCount = pageLevelDocs.length;
 
-  if (pageCount > 5) {
+  if (pageCount > 10) {
     throw new Error(
-      "Document to be vectorised can have at max 5 pages for now.",
+      "Document to be vectorised can have at max 10 pages for now.",
     );
   }
 
