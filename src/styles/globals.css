@@ -142,3 +142,48 @@
   text-decoration-skip-ink: none; /* works in Firefox & Chrome, not in Safari */
   text-decoration-skip: none; /* works in Safari, not in Firefox & Chrome */
 }
+
+.current-sentence {
+  background-color: #e3ffdd !important;
+}
+
+.current-word {
+  background-color: #74f273 !important;
+  display: inline !important;
+}
+
+@layer utilities {
+  .hd-screen {
+    /* 100vh for browsers not supporting dvh */
+    height: 100vh;
+    /* the ones that suppport dvh overrides vh */
+    height: 100dvh;
+  }
+
+  .max-hd-screen {
+    max-height: 100vh;
+    max-height: 100dvh;
+  }
+}
+
+
+
+/* Prevents zooming in on clicking forms in Safari. */
+input[type="color"],
+input[type="date"],
+input[type="datetime"],
+input[type="datetime-local"],
+input[type="email"],
+input[type="month"],
+input[type="number"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="text"],
+input[type="time"],
+input[type="url"],
+input[type="week"],
+select:focus,
+textarea {
+  font-size: 16px;
+}
