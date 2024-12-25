@@ -196,7 +196,6 @@ const CommandBody = ({
         ) : (
           <div className="flex justify-between w-full">
             <CommandInput
-              rootClassName="border-0"
               leftIcon={
                 <Sparkles className="w-4 h-4 text-gray-600 fill-gray-600" />
               }

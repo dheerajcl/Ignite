@@ -1,7 +1,9 @@
+import { PLANS } from "@/lib/constants";
 import { vectoriseDocument } from "@/lib/vectorise";
 import { createTRPCRouter, protectedProcedure } from "@/server/api/trpc";
 import { CollaboratorRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { PDFLoader } from "langchain/document_loaders/fs/pdf";
 import { z } from "zod";
 
 export const documentRouter = createTRPCRouter({
@@ -85,6 +87,7 @@ export const documentRouter = createTRPCRouter({
       const isOwner = res.owner.id === ctx.session.user.id;
       const canEdit = isOwner || collaborator?.role === CollaboratorRole.EDITOR;
       const username = isOwner ? res.owner.name : collaborator?.user.name || "";
+      const pageCount = res.pageCount;
 
       return {
         id: res.id,
@@ -100,6 +103,9 @@ export const documentRouter = createTRPCRouter({
           username,
           isOwner: res.owner.id === ctx.session.user.id,
         },
+        pageCount,
+        lastReadPage: res.lastReadPage,
+        note: res.note,
       };
     }),
 
@@ -267,6 +273,16 @@ export const documentRouter = createTRPCRouter({
           id: input.documentId,
           ownerId: ctx.session.user.id,
         },
+        select: {
+          owner: {
+            select: {
+              plan: true,
+            },
+          },
+          isVectorised: true,
+          url: true,
+          id: true,
+        },
       });
 
       if (!doc) {
@@ -283,8 +299,11 @@ export const documentRouter = createTRPCRouter({
         });
       }
 
+      const docOwnerPlan = doc.owner.plan;
+      const maxPagesAllowed = PLANS[docOwnerPlan].maxPagesPerDoc;
+
       try {
-        await vectoriseDocument(doc.url, doc.id);
+        await vectoriseDocument(doc.url, doc.id, maxPagesAllowed);
       } catch (err: any) {
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
@@ -303,11 +322,63 @@ export const documentRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        const user = await ctx.prisma.user.findUnique({
+          where: {
+            id: ctx.session.user.id,
+          },
+          select: {
+            plan: true,
+            _count: {
+              select: {
+                documents: true,
+              },
+            },
+          },
+        });
+
+        if (!user) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "User not found.",
+          });
+        }
+
+        const docCount = user._count.documents;
+        const docOwnerPlan = user.plan;
+        const maxPagesAllowed = PLANS[docOwnerPlan].maxPagesPerDoc;
+
+        if (docCount >= PLANS[user.plan].maxDocs) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "You have reached the maximum number of documents allowed. Please upgrade your plan to add more documents.",
+          });
+        }
+
+        const fileUrl = input.url;
+        const response = await fetch(fileUrl);
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        if (
+          !response.headers.get("content-type")?.includes("application/pdf")
+        ) {
+          throw new Error("Invalid file type. Only PDFs are allowed.");
+        }
+
+        const blob = await response.blob();
+        const loader = new PDFLoader(blob);
+
+        const pageLevelDocs = await loader.load();
+        const numPages = pageLevelDocs.length;
+
         const newFile = await ctx.prisma.document.create({
           data: {
             title: input.title,
             url: input.url,
             isUploaded: false,
+            pageCount: numPages,
             owner: {
               connect: {
                 id: ctx.session.user.id,
@@ -315,14 +386,7 @@ export const documentRouter = createTRPCRouter({
             },
           },
         });
-
-        // nested try-catch to not throw error if vectorisation fails
-        try {
-          await vectoriseDocument(input.url, newFile.id);
-          return newFile;
-        } catch (err: any) {
-          console.log(err.message);
-        }
+        return newFile;
       } catch (err: any) {
         console.log(err.message);
         throw new TRPCError({
@@ -330,5 +394,73 @@ export const documentRouter = createTRPCRouter({
           message: err.message,
         });
       }
+    }),
+
+  updateNotes: protectedProcedure
+    .input(
+      z.object({
+        documentId: z.string(),
+        note: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const doc = await ctx.prisma.document.findUnique({
+        where: {
+          id: input.documentId,
+          ownerId: ctx.session.user.id,
+        },
+      });
+
+      if (!doc) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Document not found or you are not the owner.",
+        });
+      }
+
+      await ctx.prisma.document.update({
+        where: {
+          id: input.documentId,
+        },
+        data: {
+          note: input.note,
+        },
+      });
+
+      return true;
+    }),
+
+  updateLastReadPage: protectedProcedure
+    .input(
+      z.object({
+        docId: z.string(),
+        lastReadPage: z.number(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const doc = await ctx.prisma.document.findUnique({
+        where: {
+          id: input.docId,
+          ownerId: ctx.session.user.id,
+        },
+      });
+
+      if (!doc) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Document not found or you are not the owner.",
+        });
+      }
+
+      await ctx.prisma.document.update({
+        where: {
+          id: input.docId,
+        },
+        data: {
+          lastReadPage: input.lastReadPage,
+        },
+      });
+
+      return true;
     }),
 });
