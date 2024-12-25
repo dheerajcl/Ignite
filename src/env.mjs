@@ -15,18 +15,18 @@ export const env = createEnv({
     ),
     GOOGLE_CLIENT_ID: z.string(),
     GOOGLE_CLIENT_SECRET: z.string(),
-    UPLOADTHING_APP_ID: z.string(),
-    UPLOADTHING_SECRET: z.string(),
+    UPLOADTHING_TOKEN: z.string(),
     OPENAI_API_KEY: z.string(),
     PINECONE_ENVIRONMENT: z.string(),
     PINECONE_API_KEY: z.string(),
     HUGGINGFACE_API_KEY: z.string(),
+    SUPABASE_SERVICE_KEY: z.string(),
+    PUBLIC_SUPABASE_URL: z.string().min(1),
   },
 
   client: {
     NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_API_KEY: z.string().min(1),
     NEXT_PUBLIC_ENV: z.enum(["development", "test", "production"]).optional(),
-    // NEXT_PUBLIC_CLIENTVAR: z.string().min(1),
   },
 
   runtimeEnv: {
@@ -37,14 +37,15 @@ export const env = createEnv({
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-    UPLOADTHING_APP_ID: process.env.UPLOADTHING_APP_ID,
-    UPLOADTHING_SECRET: process.env.UPLOADTHING_SECRET,
+    UPLOADTHING_TOKEN: process.env.UPLOADTHING_TOKEN,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     PINECONE_ENVIRONMENT: process.env.PINECONE_ENVIRONMENT,
     PINECONE_API_KEY: process.env.PINECONE_API_KEY,
     HUGGINGFACE_API_KEY: process.env.HUGGINGFACE_API_KEY,
     NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_API_KEY:
       process.env.NEXT_PUBLIC_LIVEBLOCKS_PUBLIC_API_KEY,
+    PUBLIC_SUPABASE_URL: process.env.PUBLIC_SUPABASE_URL,
+    SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
   },
 
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
