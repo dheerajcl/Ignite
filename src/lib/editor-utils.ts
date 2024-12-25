@@ -29,12 +29,16 @@ import {
 //   );
 // };
 
+const { audio, video, file, ...remainingBlockSpecs } = defaultBlockSpecs;
+
+const blockSpecs = {
+  ...remainingBlockSpecs,
+  alert: AlertBlock,
+  highlight: HighlighBlock,
+};
+
 export const schema = BlockNoteSchema.create({
-  blockSpecs: {
-    ...defaultBlockSpecs,
-    alert: AlertBlock,
-    highlight: HighlighBlock,
-  },
+  blockSpecs,
   inlineContentSpecs: {
     ...defaultInlineContentSpecs,
     // comment: Comment,
