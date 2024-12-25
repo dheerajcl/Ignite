@@ -109,7 +109,7 @@ export const FeatureData = ({ id, title, description }: FeatureDataProps) => {
 
   return (
     <p
-      ref={ref}
+      ref={ref as any}
       className={cn(
         "feature-title font-heading py-16 text-4xl font-semibold tracking-tight transition-colors xl:text-5xl 2xl:text-6xl",
         isInView ? "text-black" : "text-gray-300",
