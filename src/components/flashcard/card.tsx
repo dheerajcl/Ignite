@@ -1,390 +1,314 @@
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import BouncingLoader from "@/components/ui/bouncing-loader";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/use-toast";
-import { api } from "@/lib/api";
-import { RequestOptions } from "ai";
-import { useCompletion } from "ai/react";
 import {
-  BugIcon,
-  CheckCircleIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  InfoIcon,
-  RefreshCwIcon,
-} from "lucide-react";
-import { useRouter } from "next/router";
-import { useState } from "react";
+  Command,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { useBlockNoteEditor } from "@blocknote/react";
+import { useCompletion } from "ai/react";
+import { useCommandState } from "cmdk";
+import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { Dispatch, SetStateAction, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import { toast } from "sonner";
 
-interface FlashcardAttemptType {
-  userResponse: string;
-  correctResponse: string | null;
-  incorrectResponse: string | null;
-  moreInfo: string | null;
-}
+type AiPopoverProps = {
+  rect: AiPopoverPropsRect | null;
+  setRect: Dispatch<SetStateAction<AiPopoverPropsRect | null>>;
+};
 
-const IndividualFlashcard = ({
-  question,
-  answer,
-  total,
-  current,
-  setCurrent,
-  id,
-  attempts,
+export type AiPopoverPropsRect = {
+  top: number;
+  left: number;
+  width: number;
+  blockId: string;
+  text: string;
+};
+
+const AiPopover = ({ rect, setRect }: AiPopoverProps) => {
+  const closePopover = () => {
+    setRect(null);
+  };
+
+  if (!rect) return;
+
+  return (
+    <Popover
+      modal={true}
+      open={!!rect}
+      onOpenChange={(open) => {
+        if (!open) {
+          closePopover();
+        }
+      }}
+    >
+      <PopoverContent
+        style={{
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+        }}
+        className="absolute z-[1000] p-0 text-black bg-transparent border-0 shadow-none"
+      >
+        <Command className="bg-transparent">
+          <CommandBody closePopover={closePopover} rect={rect} />
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+};
+
+export default AiPopover;
+
+const AI_COMPLETIONS = [
+  {
+    category: "Edit or review selection",
+    items: [
+      "Improve writing",
+      "Fix spelling & grammar",
+      "Summarise",
+      "Explain this",
+      "Find action items",
+      // {
+      //   title: "Improve writing",
+      // },
+      // {
+      //   title: "Fix spelling & grammar",
+      // },
+      // {
+      //   title: "Summarise",
+      // },
+      // {
+      //   title: "Explain this",
+      // },
+      // {
+      //   title: "Find action items",
+      // },
+    ],
+  },
+];
+
+const CommandBody = ({
+  rect,
+  closePopover,
 }: {
-  question: string;
-  answer: string;
-  total: number;
-  current: number;
-  setCurrent: React.Dispatch<React.SetStateAction<number>>;
-  id: string;
-  attempts: FlashcardAttemptType[];
+  rect: AiPopoverPropsRect;
+  closePopover: () => void;
 }) => {
-  const [hasAttempted, setHasAttempted] = useState(false);
+  const [curIndex, setCurIndex] = useState<null | number>(null);
+  const [query, setQuery] = useState("");
+  const incrementCur = () => {
+    setCurIndex(completions.length);
+  };
 
-  const { query } = useRouter();
-  const documentId = query?.docId as string;
-  const utils = api.useContext();
+  const editor = useBlockNoteEditor();
 
-  const { complete, completion, isLoading, setCompletion } = useCompletion({
-    body: {
-      flashcardId: id,
-      docId: documentId,
-    },
+  const AI_OPTIONS_AFTER_COMPLETION = [
+    {
+      title: "Replace selection",
 
-    onFinish: (_prompt, completion) => {
-      utils.flashcard.getFlashcards.setData({ documentId }, (prev) => {
-        if (!prev) return prev;
-        return prev.map((flashcard) => {
-          if (flashcard.id === id) {
-            return {
-              ...flashcard,
-              flashcardAttempts: [
-                ...flashcard.flashcardAttempts,
-                {
-                  userResponse,
-                  correctResponse: completion.split("||")[0] ?? null,
-                  incorrectResponse: completion.split("||")[1] ?? null,
-                  moreInfo: completion.split("||")[2] ?? null,
-                  createdAt: new Date(),
-                },
-              ],
-            };
-          }
-          return flashcard;
+      onClick: () => {
+        if (curIndex === null) return;
+        const text = completions[curIndex];
+        editor.updateBlock(rect.blockId, {
+          content: text,
         });
-      });
+        closePopover();
+      },
     },
+    {
+      title: "Insert below",
+      onClick: () => {
+        if (curIndex === null) return;
+        const text = completions[curIndex];
+        editor.insertBlocks(
+          [
+            {
+              content: text,
+              type: "paragraph",
+            },
+          ],
+          {
+            id: rect.blockId,
+          },
+          "after",
+        );
+        closePopover();
+      },
+    },
+  ];
 
-    onError: (err: any) => {
-      console.log(err.message);
-      toast({
-        title: "Error",
-        description: "Something went wrong with text generation",
-        variant: "destructive",
+  const [completions, setCompletions] = useState<string[]>([]);
+
+  const filteredCount = useCommandState((state) => state.filtered.count);
+  const { complete, completion, stop, isLoading } = useCompletion({
+    onFinish: (_prompt, completion) => {
+      setCompletions((prev) => [...prev, completion]);
+      setQuery("");
+    },
+    onError: (err) => {
+      toast.error("Something went wrong with text generation", {
         duration: 3000,
       });
     },
-    api: "/api/evaluate",
+    api: "/api/completion",
   });
 
-  const toggleAttempt = () => {
-    setHasAttempted((prev) => !prev);
-  };
-
-  const [userResponse, setUserResponse] = useState("");
-
-  return (
-    <div className="flex h-full flex-col justify-between ">
-      <div className="flex-grow overflow-scroll">
-        {hasAttempted ? (
-          <IndividualFlashcardReport
-            question={question}
-            answer={answer}
-            total={total}
-            current={current}
-            //   think whether or not to show previous attempts in the current report. also think whether to add along w. the question screen
-            completion={completion}
-            isLoading={isLoading}
-            toggleAttempt={toggleAttempt}
-            userResponse={userResponse}
-            setUserResponse={setUserResponse}
-          />
-        ) : (
-          <IndividualFlashcardQuestion
-            attempts={attempts}
-            setCompletion={setCompletion}
-            complete={complete}
-            question={question}
-            answer={answer}
-            toggleAttempt={toggleAttempt}
-            userResponse={userResponse}
-            setUserResponse={setUserResponse}
-          />
-        )}
-      </div>
-
-      {/* bottom navigation */}
-      <div className="flex h-8 items-center justify-between border-t border-gray-100 py-7">
-        <Button
-          className="flex items-center"
-          variant="ghost"
-          disabled={current === 1}
-          onClick={() => {
-            if (hasAttempted) {
-              toggleAttempt();
-            }
-            setUserResponse("");
-            setCompletion("");
-            setCurrent((prev) => prev - 1);
-          }}
-        >
-          <ChevronLeftIcon className="h-6 w-6 text-gray-600" />
-          <span className="ml-2">Back</span>
-        </Button>
-
-        <span className="text-gray-500">
-          {current} / {total}
-        </span>
-
-        <Button
-          className="flex items-center"
-          variant="ghost"
-          disabled={current === total}
-          onClick={() => {
-            if (hasAttempted) {
-              toggleAttempt();
-            }
-            setUserResponse("");
-            setCompletion("");
-            setCurrent((prev) => prev + 1);
-          }}
-        >
-          <span className="mr-2">Skip</span>
-          <ChevronRightIcon className="h-6 w-6 text-gray-600" />
-        </Button>
-      </div>
-    </div>
-  );
-};
-export default IndividualFlashcard;
-
-const IndividualFlashcardQuestion = ({
-  question,
-  answer,
-  complete,
-  toggleAttempt,
-  userResponse,
-  setUserResponse,
-  setCompletion,
-  attempts,
-}: {
-  question: string;
-  answer: string;
-  complete: (
-    prompt: string,
-    options?: RequestOptions | undefined,
-  ) => Promise<string | null | undefined>;
-  toggleAttempt: () => void;
-  userResponse: string;
-  setUserResponse: React.Dispatch<React.SetStateAction<string>>;
-  setCompletion: (completion: string) => void;
-  attempts: FlashcardAttemptType[];
-}) => {
-  return (
-    <div className="flex h-full flex-grow flex-col justify-between">
-      <div>
-        <div className="mb-4">
-          <div className="rounded-t-lg bg-gray-100 p-4">
-            <h1 className="text-lg font-semibold">{question}</h1>
-          </div>
-          <div className="rounded-b-lg border border-t-0 p-4">
-            <Textarea
-              value={userResponse}
-              onChange={(e) => setUserResponse(e.target.value)}
-              className="h-24 w-full p-2"
-              placeholder="Enter your answer..."
-            />
-          </div>
-        </div>
-
-        <div className="mb-8 flex items-center justify-between px-2">
-          <Button
-            disabled={!userResponse}
-            onClick={() => {
-              toggleAttempt();
-              complete(userResponse);
-            }}
-            className="bg-blue-400 text-white hover:bg-blue-500"
-          >
-            Answer
-          </Button>
-          <Button
-            onClick={() => {
-              toggleAttempt();
-              setCompletion("");
-            }}
-            variant="ghost"
-          >
-            Don&apos;t know
-          </Button>
-        </div>
-        {/* <div className="flex items-center justify-between border-t pt-4"> */}
-      </div>
-
-      <div>
-        {attempts.length > 0 && (
-          <>
-            <h2 className="mb-2 font-semibold text-gray-600">
-              Previous attempts
-            </h2>
-
-            <Accordion type="single" collapsible>
-              {attempts.map((attempt, index) => (
-                <AccordionItem value={index.toString()} key={index}>
-                  <AccordionTrigger className="px-2 font-semibold">
-                    {index + 1}
-                  </AccordionTrigger>
-                  <AccordionContent className="rounded-md bg-gray-50 p-4">
-                    <div className="mb-4 rounded-md bg-[#F7F5FB] p-4">
-                      <h4 className="mb-2 flex items-center text-sm font-semibold text-[#5937AB]">
-                        Your Response
-                      </h4>
-                      <p className="text-sm">{attempt.userResponse}</p>
-                    </div>
-                    <Feedback
-                      correctResponse={attempt.correctResponse}
-                      wrongResponse={attempt.incorrectResponse}
-                      moreInfo={attempt.moreInfo}
-                    />
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-const IndividualFlashcardReport = ({
-  question,
-  answer,
-  total,
-  current,
-  toggleAttempt,
-  completion,
-  isLoading,
-  userResponse,
-  setUserResponse,
-}: {
-  question: string;
-  answer: string;
-  total: number;
-  current: number;
-  toggleAttempt: () => void;
-  completion: string;
-  isLoading: boolean;
-  userResponse: string;
-  setUserResponse: React.Dispatch<React.SetStateAction<string>>;
-}) => {
-  const splitResponse = completion.split("||");
+  const responseExists =
+    curIndex !== null &&
+    curIndex < completions.length &&
+    !!completions[curIndex];
   return (
     <>
-      <div>
-        <div className="mb-2 flex items-center justify-between pl-2">
-          <h3 className="text-lg font-semibold">{question}</h3>
-          <Button
-            title="Try again"
-            variant="ghost"
-            onClick={() => {
-              toggleAttempt();
-              setUserResponse("");
-            }}
-          >
-            <RefreshCwIcon className="h-5 w-5" />
-          </Button>
-        </div>
-        {/* <p className="mb-4 text-sm text-gray-500">From page 7</p> */}
-        {userResponse && (
-          <div className="mb-6 rounded-md bg-[#f7fafc] p-4">
-            <p className="mb-2 font-semibold">Your answer</p>
-            <p className="text-sm">{userResponse}</p>
+      <div className="w-full hover:cursor-auto items-start flex flex-col bg-white max-h-[300px] overflow-y-auto overflow-x-hidden border border-gray-200 rounded-md shadow-md">
+        {(isLoading || responseExists) && (
+          <ReactMarkdown className="px-2 py-1 prose-sm ">
+            {responseExists ? completions[curIndex] : completion}
+          </ReactMarkdown>
+        )}
+        {isLoading ? (
+          <div className="flex w-full items-center justify-between px-2">
+            <div className="flex items-center gap-1 text">
+              <p className="text-sm">AI is writing</p>
+              <div className="scale-[80%]">
+                <BouncingLoader />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {/* <Button variant="ghost" className="p-1 hover:cursor-pointer">
+                <p>Try again</p>
+              </Button> */}
+              <Button
+                variant="ghost"
+                onClick={stop}
+                size="sm"
+                className="p-1 hover:cursor-pointer"
+              >
+                <p className="text-sm text-gray-700">Stop</p>
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex justify-between w-full">
+            <CommandInput
+              rootClassName="border-0"
+              leftIcon={
+                <Sparkles className="w-4 h-4 text-gray-600 fill-gray-600" />
+              }
+              rightIcon={
+                curIndex !== null ? (
+                  <div className="flex items-center">
+                    <Button
+                      variant="ghost"
+                      className="bg-white p-0 hover:cursor-pointer h-5"
+                      disabled={curIndex === 0}
+                      onClick={() => {
+                        if (curIndex > 0) {
+                          setCurIndex(curIndex - 1);
+                        }
+                      }}
+                    >
+                      <ChevronLeft className="w-5 h-5 text-gray-600" />
+                    </Button>
+                    <p className="text-xs text-gray-500">
+                      {curIndex + 1} of {completions.length}
+                    </p>
+                    <Button
+                      variant="ghost"
+                      className="bg-white p-0 hover:cursor-pointer h-5"
+                      disabled={curIndex >= completions.length - 1}
+                      onClick={() => {
+                        if (curIndex < completions.length - 1) {
+                          setCurIndex(curIndex + 1);
+                        }
+                      }}
+                    >
+                      <ChevronRight className="w-5 h-5 text-gray-600" />
+                    </Button>
+                  </div>
+                ) : (
+                  <></>
+                )
+              }
+              value={query}
+              onValueChange={(value) => setQuery(value)}
+              className="px-0 py-0 font-normal outline-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-8 flex-1 bg-white border-0"
+              autoFocus={true}
+              placeholder={
+                responseExists
+                  ? "Tell AI what to do next"
+                  : "Ask AI to edit or generate..."
+              }
+              onKeyDown={async (e) => {
+                if (e.key === "Enter" && filteredCount === 0) {
+                  incrementCur();
+                  complete(
+                    `${(e.target as HTMLInputElement).value}: ${rect.text}`,
+                  );
+                }
+              }}
+            />
+
+            {/* <ArrowUpCircle className="w-5 h-5 text-gray-100 fill-gray-600" /> */}
           </div>
         )}
-        {(isLoading || completion) && (
-          <>
-            <h2 className="mb-2 px-2 font-semibold text-gray-600">Feedback</h2>
-            <Feedback
-              correctResponse={splitResponse[0]}
-              wrongResponse={splitResponse[1]}
-              moreInfo={splitResponse[2]}
-            />
-          </>
-        )}
-        <Accordion
-          type="single"
-          collapsible
-          defaultValue={isLoading || completion ? undefined : "answer"}
-        >
-          <AccordionItem value="answer">
-            <AccordionTrigger className="px-2 font-semibold">
-              Answer
-            </AccordionTrigger>
-            <AccordionContent className="rounded-md bg-gray-100 p-4">
-              {answer}
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
       </div>
-    </>
-  );
-};
 
-const Feedback = ({
-  correctResponse,
-  wrongResponse,
-  moreInfo,
-}: {
-  correctResponse?: string | null;
-  wrongResponse?: string | null;
-  moreInfo?: string | null;
-}) => {
-  return (
-    <div className="space-y-4">
-      {correctResponse && (
-        <div className="rounded-md bg-[#f0fff4] p-4">
-          <h4 className="mb-2 flex items-center text-sm font-semibold text-green-700">
-            <CheckCircleIcon className="mr-2" />
-            What you got right
-          </h4>
-          <p className="text-sm">{correctResponse}</p>
-        </div>
+      {!isLoading && (
+        <>
+          {responseExists ? (
+            <CommandList
+              className={cn(
+                "w-[20rem] bg-white border border-gray-200 mt-1 rounded-md shadow-md max-w-[80%]",
+                filteredCount === 0 && "border-0",
+              )}
+            >
+              {AI_OPTIONS_AFTER_COMPLETION.map((item: any) => (
+                <CommandItem
+                  key={item.title}
+                  onSelect={() => {
+                    item.onClick();
+                  }}
+                >
+                  {item.title}
+                </CommandItem>
+              ))}
+            </CommandList>
+          ) : (
+            <CommandList
+              className={cn(
+                "w-[20rem] bg-white border border-gray-200 mt-1 rounded-md shadow-md max-w-[80%]",
+                filteredCount === 0 && "border-0",
+              )}
+            >
+              {AI_COMPLETIONS.map((item) => (
+                <CommandGroup
+                  className="bg-transparent"
+                  heading={item.category}
+                  key={item.category}
+                >
+                  {item.items.map((inner) => (
+                    <CommandItem
+                      onSelect={async () => {
+                        incrementCur();
+                        complete(`${inner}: ${rect.text}`);
+                      }}
+                      key={inner}
+                    >
+                      {inner}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ))}
+            </CommandList>
+          )}
+        </>
       )}
-      {wrongResponse && (
-        <div className="rounded-md bg-[#fef2f2] p-4">
-          <h4 className="mb-2 flex items-center text-sm font-semibold text-red-700">
-            <BugIcon className="mr-2" />
-            What you got wrong
-          </h4>
-          <p className="text-sm">{wrongResponse}</p>
-        </div>
-      )}
-      {moreInfo && (
-        <div className="rounded-md bg-[#ebf4ff] p-4">
-          <h4 className="mb-2 flex items-center text-sm font-semibold text-blue-700">
-            <InfoIcon className="mr-2" />
-            More info
-          </h4>
-          <p className="text-sm">{moreInfo}</p>
-        </div>
-      )}
-    </div>
+    </>
   );
 };

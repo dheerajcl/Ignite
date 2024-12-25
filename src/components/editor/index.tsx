@@ -1,101 +1,107 @@
-import { toast } from "@/components/ui/use-toast";
 import { getSlashMenuItems, schema } from "@/lib/editor-utils";
 import { useBlocknoteEditorStore } from "@/lib/store";
-import { getRandomLightColor, isDev } from "@/lib/utils";
-import { YjsEditorProps } from "@/types/editor";
 import {
+  BlockNoteEditor,
   filterSuggestionItems,
   uploadToTmpFilesDotOrg_DEV_ONLY,
 } from "@blocknote/core";
+import { BlockNoteView } from "@blocknote/mantine";
 import {
   BasicTextStyleButton,
   BlockColorsItem,
-  BlockNoteView,
   BlockTypeSelect,
   ColorStyleButton,
   CreateLinkButton,
   DragHandleMenu,
-  DragHandleMenuItem,
+  DragHandleMenuProps,
+  FileCaptionButton,
   FormattingToolbar,
   FormattingToolbarController,
-  ImageCaptionButton,
   RemoveBlockItem,
-  ReplaceImageButton,
   SideMenu,
   SideMenuController,
   SuggestionMenuController,
   TextAlignButton,
-  useCreateBlockNote,
+  useBlockNoteEditor,
+  useComponentsContext,
 } from "@blocknote/react";
-import LiveblocksProvider from "@liveblocks/yjs";
 import { useCompletion } from "ai/react";
-import { useRoom } from "liveblocks.config";
-import { useEffect, useRef, useState } from "react";
-import * as Y from "yjs";
+import {
+  Dispatch,
+  SetStateAction,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { toast } from "sonner";
 // import { CommentFormattingToolbarButton } from "@/components/Editor/CustomBlocks/Comment";
 import AiPopover, {
   AiPopoverPropsRect,
 } from "@/components/editor/custom/ai/popover";
+import { SpinnerCentered } from "@/components/ui/spinner";
+import { api } from "@/lib/api";
+import { useRouter } from "next/router";
+import { useDebouncedCallback } from "use-debounce";
+
+// export default function Editor({
+//   canEdit,
+//   username,
+// }: {
+//   canEdit: boolean;
+//   username: string;
+// }) {
+//   const room = useRoom();
+//   const [doc, setDoc] = useState<Y.Doc>();
+//   const [provider, setProvider] = useState<any>();
+
+//   // Set up Liveblocks Yjs provider
+//   useEffect(() => {
+//     const yDoc = new Y.Doc();
+//     const yProvider = new LiveblocksProvider(room, yDoc);
+
+//     setDoc(yDoc);
+//     setProvider(yProvider);
+
+//     return () => {
+//       yDoc?.destroy();
+//       yProvider?.destroy();
+//     };
+//   }, [room]);
+
+//   if (!doc || !provider) {
+//     return null;
+//   }
+
+//   return (
+//     <BlockNoteEditor
+//       canEdit={canEdit}
+//       username={username}
+//       doc={doc}
+//       provider={provider}
+//     />
+//   );
+// }
 
 export default function Editor({
   canEdit,
-  username,
+  note,
 }: {
   canEdit: boolean;
-  username: string;
+  note: string | null;
 }) {
-  const room = useRoom();
-  const [doc, setDoc] = useState<Y.Doc>();
-  const [provider, setProvider] = useState<any>();
+  const { mutate: updateNotesMutation } =
+    api.document.updateNotes.useMutation();
 
-  // Set up Liveblocks Yjs provider
-  useEffect(() => {
-    const yDoc = new Y.Doc();
-    const yProvider = new LiveblocksProvider(room, yDoc);
+  const { query } = useRouter();
+  const documentId = query?.docId as string;
 
-    setDoc(yDoc);
-    setProvider(yProvider);
-
-    return () => {
-      yDoc?.destroy();
-      yProvider?.destroy();
-    };
-  }, [room]);
-
-  if (!doc || !provider) {
-    return null;
-  }
-
-  return (
-    <BlockNoteEditor
-      canEdit={canEdit}
-      username={username}
-      doc={doc}
-      provider={provider}
-    />
-  );
-}
-
-function BlockNoteEditor({ doc, provider, canEdit, username }: YjsEditorProps) {
-  // const { mutate: updateNotesMutation } =
-  //   api.document.updateNotes.useMutation();
-
-  // const { data, error, isError } = api.document.getNotesData.useQuery(
-  //   {
-  //     docId: query?.docId as string,
-  //   },
-  //   {
-  //     enabled: !!query?.docId,
-  //     retry: false,
-  //   },
-  // );
-
-  // const debounced = useDebouncedCallback((value) => {
-  //   updateNotesMutation({
-  //     markdown: value,
-  //     documentId: query?.docId as string,
-  //   });
-  // }, 3000);
+  const debounced = useDebouncedCallback((value) => {
+    updateNotesMutation({
+      note: value,
+      documentId,
+    });
+  }, 2000);
 
   const { setEditor } = useBlocknoteEditorStore();
 
@@ -107,13 +113,10 @@ function BlockNoteEditor({ doc, provider, canEdit, username }: YjsEditorProps) {
       //   to: editor._tiptapEditor.state.selection.from,
       // });
 
-      editor._tiptapEditor.commands.focus("end");
+      editor?._tiptapEditor.commands.focus("end");
     },
     onError: (err) => {
-      toast({
-        title: "Error",
-        description: "Something went wrong with text generation",
-        variant: "destructive",
+      toast.error("Something went wrong with text generation", {
         duration: 3000,
       });
     },
@@ -129,7 +132,6 @@ function BlockNoteEditor({ doc, provider, canEdit, username }: YjsEditorProps) {
   // };
   // const insertAi: ReactSlashMenuItem<typeof blockSchema> = {
   //   name: "Continue with AI",
-  //   // @ts-ignore
   //   execute: generateAiContent,
   //   aliases: ["ai", "fill"],
   //   group: "AI",
@@ -137,35 +139,44 @@ function BlockNoteEditor({ doc, provider, canEdit, username }: YjsEditorProps) {
   //   hint: "Continue your idea with some extra inspiration!",
   // };
 
-  const editor = useCreateBlockNote(
-    {
-      // onEditorContentChange: (editor) => {
-      //   debounced(JSON.stringify(editor.topLevelBlocks, null, 2));
-      // },
-      schema,
-      ...(isDev
-        ? {}
-        : {
-            collaboration: {
-              provider,
-              fragment: doc.getXmlFragment("document-store"),
-              user: {
-                name: username || "User",
-                color: getRandomLightColor(),
-              },
-            },
-          }),
+  const editor = useMemo(() => {
+    try {
+      // TODO note is null by "default" => should prob set the default value in prisma schemas as "[]"
+      const initialContent = note ? JSON.parse(note) : undefined;
 
-      // todo replace this with our storage
-      uploadFile: uploadToTmpFilesDotOrg_DEV_ONLY,
-      domAttributes: {
-        editor: {
-          class: "my-6",
+      return BlockNoteEditor.create({
+        initialContent: initialContent,
+        schema,
+        // ...(isDev
+        //   ? {}
+        //   : {
+        //       collaboration: {
+        //         provider,
+        //         fragment: doc.getXmlFragment("document-store"),
+        //         user: {
+        //           name: username || "User",
+        //           color: getRandomLightColor(),
+        //         },
+        //       },
+        //     }),
+
+        // todo replace this with our storage
+        uploadFile: uploadToTmpFilesDotOrg_DEV_ONLY as (
+          file: File,
+          blockId?: string,
+        ) => Promise<string>,
+
+        domAttributes: {
+          editor: {
+            class: "my-6",
+          },
         },
-      },
-    },
-    [],
-  );
+      });
+    } catch (err) {
+      toast.error("Error parsing note", { duration: 3000 });
+      return undefined;
+    }
+  }, [note]);
 
   useEffect(() => {
     if (!editor) return;
@@ -183,7 +194,7 @@ function BlockNoteEditor({ doc, provider, canEdit, username }: YjsEditorProps) {
       prev.current = completion;
 
       const block = editor.getTextCursorPosition().block;
-      const blockText = (await editor.blocksToMarkdownLossy([block])).trim();
+      const blockText = (await editor?.blocksToMarkdownLossy([block]))?.trim();
 
       editor.updateBlock(editor.getTextCursorPosition().block, {
         id: editor.getTextCursorPosition().block.id,
@@ -231,41 +242,13 @@ function BlockNoteEditor({ doc, provider, canEdit, username }: YjsEditorProps) {
 
   const [rect, setRect] = useState<AiPopoverPropsRect | null>(null);
 
-  // useEffect(() => {
-  //   if (!rect) return;
+  if (editor === undefined) {
+    return <SpinnerCentered />;
+  }
 
-  //   const handleScroll = () => {
-  //     console.log("SCROLLINN");
-
-  //     const blockDiv = document.querySelector(
-  //       `div[data-id="${rect.blockId}"]`,
-  //     ) as HTMLElement;
-
-  //     if (!blockDiv) return;
-
-  //     const newRect = blockDiv.getBoundingClientRect();
-
-  //     setRect((prev) => {
-  //       if (!prev) return null;
-  //       return {
-  //         ...prev,
-  //         top: newRect.top + newRect.height,
-  //         left: newRect.left,
-  //         width: newRect.width,
-  //       };
-  //     });
-  //   };
-
-  //   editor.domElement.addEventListener("scroll", handleScroll);
-
-  //   return () => {
-  //     editor.domElement.removeEventListener("scroll", handleScroll);
-  //   };
-  // }, []);
   return (
     <div>
       <BlockNoteView
-        // ref={editorRef}
         sideMenu={false}
         onChange={async () => {
           const block = editor.getTextCursorPosition().block;
@@ -281,6 +264,8 @@ function BlockNoteEditor({ doc, provider, canEdit, username }: YjsEditorProps) {
             });
             complete(blockText?.slice(-500) ?? "");
           }
+          // this is firing on initial load => store server value in useRef, and display a icon saying "loading" or "saved". and only if its different from current copy run the mutation
+          debounced(JSON.stringify(editor.document, null, 2));
         }}
         className="w-full flex-1"
         theme={"light"}
@@ -303,8 +288,9 @@ function BlockNoteEditor({ doc, provider, canEdit, username }: YjsEditorProps) {
 
               {/* <CommentFormattingToolbarButton key={"customButton"} /> */}
 
-              <ImageCaptionButton key={"imageCaptionButton"} />
-              <ReplaceImageButton key={"replaceImageButton"} />
+              {/* <ImageCaptionButton key={"imageCaptionButton"} />
+              <ReplaceImageButton key={"replaceImageButton"} /> */}
+              <FileCaptionButton key="fileCaptionButton" />
 
               <BasicTextStyleButton
                 basicTextStyle={"bold"}
@@ -357,47 +343,7 @@ function BlockNoteEditor({ doc, provider, canEdit, username }: YjsEditorProps) {
               dragHandleMenu={(props) => (
                 <DragHandleMenu {...props}>
                   <RemoveBlockItem {...props}>Delete</RemoveBlockItem>
-                  <DragHandleMenuItem
-                    onClick={async () => {
-                      const blockDiv = document.querySelector(
-                        `div[data-id="${props.block.id}"]`,
-                      ) as HTMLElement;
-
-                      if (!blockDiv) return;
-
-                      // select the div
-                      // const selection = window.getSelection();
-                      // const range = document.createRange();
-                      // range.selectNodeContents(blockDiv);
-                      // selection?.removeAllRanges();
-                      // selection?.addRange(range);
-
-                      // scroll to the div
-                      // blockDiv.scrollIntoView({
-                      //   behavior: "smooth",
-                      //   block: "center",
-                      // });
-
-                      const rect = blockDiv.getBoundingClientRect();
-                      const top = rect.top + rect.height;
-                      const left = rect.left;
-                      const width = rect.width;
-
-                      const text = await editor.blocksToMarkdownLossy([
-                        props.block,
-                      ]);
-
-                      setRect({
-                        top,
-                        left,
-                        width,
-                        blockId: props.block.id,
-                        text,
-                      });
-                    }}
-                  >
-                    AI
-                  </DragHandleMenuItem>
+                  <AiDragHandleMenu {...props} setRect={setRect} />
 
                   <BlockColorsItem {...props}>Colors</BlockColorsItem>
                 </DragHandleMenu>
@@ -410,3 +356,54 @@ function BlockNoteEditor({ doc, provider, canEdit, username }: YjsEditorProps) {
     </div>
   );
 }
+
+const AiDragHandleMenu = (
+  props: DragHandleMenuProps & {
+    setRect: Dispatch<SetStateAction<AiPopoverPropsRect | null>>;
+  },
+) => {
+  const editor = useBlockNoteEditor();
+  const Components = useComponentsContext()!;
+
+  return (
+    <Components.Generic.Menu.Item
+      onClick={async () => {
+        const blockDiv = document.querySelector(
+          `div[data-id="${props.block.id}"]`,
+        ) as HTMLElement;
+
+        if (!blockDiv) return;
+
+        // select the div
+        // const selection = window.getSelection();
+        // const range = document.createRange();
+        // range.selectNodeContents(blockDiv);
+        // selection?.removeAllRanges();
+        // selection?.addRange(range);
+
+        // scroll to the div
+        // blockDiv.scrollIntoView({
+        //   behavior: "smooth",
+        //   block: "center",
+        // });
+
+        const rect = blockDiv.getBoundingClientRect();
+        const top = rect.top + rect.height;
+        const left = rect.left;
+        const width = rect.width;
+
+        const text = await editor.blocksToMarkdownLossy([props.block]);
+
+        props.setRect({
+          top,
+          left,
+          width,
+          blockId: props.block.id,
+          text,
+        });
+      }}
+    >
+      AI
+    </Components.Generic.Menu.Item>
+  );
+};
