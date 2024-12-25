@@ -1,12 +1,11 @@
-import PdfReader from "@/components/pdf-reader/pdf-reader";
+import PdfReader from "@/components/pdf-reader/reader";
 import { buttonVariants } from "@/components/ui/button";
-import { toast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import { useBlocknoteEditorStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { AppRouter } from "@/server/api/root";
-import { HighlightContentType, HighlightPositionType } from "@/types/highlight";
-import { insertOrUpdateBlock } from "@blocknote/core";
+import { BlockNoteEditorType } from "@/types/editor";
+import { AddHighlightType, HighlightContentType } from "@/types/highlight";
 import { createId } from "@paralleldrive/cuid2";
 import { HighlightTypeEnum } from "@prisma/client";
 import { inferRouterOutputs } from "@trpc/server";
@@ -14,18 +13,90 @@ import { ChevronLeftIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
+import { toast } from "sonner";
 
-type RouterOutput = inferRouterOutputs<AppRouter>;
-type HighlightType =
-  RouterOutput["document"]["getDocData"]["highlights"][number];
+const addHighlightToNotes = async (
+  content: string,
+  highlightId: string,
+  type: HighlightContentType,
+  editor: BlockNoteEditorType | null,
+  canEdit: boolean,
+) => {
+  if (!editor) {
+    toast.error("Couldn't add highlight to text, try reloading the page.", {
+      duration: 3000,
+    });
+    return;
+  }
 
-interface AddHighlighType {
-  content: {
-    text?: string;
-    image?: string;
-  };
-  position: HighlightPositionType;
-}
+  if (!canEdit) {
+    toast.error(
+      "User doesn't have the required permission to edit the document",
+      {
+        duration: 3000,
+      },
+    );
+    return;
+  }
+
+  if (type === HighlightContentType.TEXT) {
+    if (!content || !highlightId) return;
+
+    try {
+      editor.insertBlocks(
+        [
+          {
+            type: "highlight",
+            content,
+            props: {
+              highlightId,
+            },
+          },
+        ],
+        // cause of noUncheckedIndexedAccess => issue in blocknote
+        // @ts-ignore
+        editor.document[editor.document.length - 1],
+      );
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  } else {
+    if (!content || !highlightId || !editor.uploadFile) return;
+
+    const base64StringWithoutHeader = content.split(",")[1];
+    if (!base64StringWithoutHeader) {
+      toast.error("Invalid image", { duration: 3000 });
+      return;
+    }
+
+    const byteArray = Uint8Array.from(atob(base64StringWithoutHeader), (c) =>
+      c.charCodeAt(0),
+    );
+    const file = new File([byteArray], `${highlightId}.png`, {
+      type: "image/png",
+    });
+
+    const url = (await editor.uploadFile(file)) as string;
+
+    try {
+      editor.insertBlocks(
+        [
+          {
+            props: {
+              url,
+            },
+            type: "image",
+          },
+        ],
+        // cause of noUncheckedIndexedAccess => issue in blocknote
+        // @ts-ignore
+        editor.document[editor.document.length - 1],
+      );
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  }
+};
 
 const DocViewer = ({
   canEdit,
@@ -36,7 +107,7 @@ const DocViewer = ({
 }) => {
   const { query, isReady } = useRouter();
 
-  const docId = query?.docId;
+  const docId = query?.docId as string;
 
   const { mutate: addHighlightMutation } = api.highlight.add.useMutation({
     async onMutate(newHighlight) {
@@ -44,7 +115,7 @@ const DocViewer = ({
       const prevData = utils.document.getDocData.getData();
 
       // @ts-ignore
-      utils.document.getDocData.setData({ docId: docId as string }, (old) => {
+      utils.document.getDocData.setData({ docId: docId }, (old) => {
         if (!old) return null;
 
         return {
@@ -65,17 +136,11 @@ const DocViewer = ({
       return { prevData };
     },
     onError(err, newPost, ctx) {
-      toast({
-        title: "Error",
-        description: "Something went wrong",
-        variant: "destructive",
+      toast.error("Something went wrong", {
         duration: 3000,
       });
 
-      utils.document.getDocData.setData(
-        { docId: docId as string },
-        ctx?.prevData,
-      );
+      utils.document.getDocData.setData({ docId: docId }, ctx?.prevData);
     },
     onSettled() {
       // Sync with server once mutation has settled
@@ -87,7 +152,7 @@ const DocViewer = ({
       await utils.document.getDocData.cancel();
       const prevData = utils.document.getDocData.getData();
 
-      utils.document.getDocData.setData({ docId: docId as string }, (old) => {
+      utils.document.getDocData.setData({ docId: docId }, (old) => {
         if (!old) return undefined;
         return {
           ...old,
@@ -102,16 +167,10 @@ const DocViewer = ({
       return { prevData };
     },
     onError(err, newPost, ctx) {
-      toast({
-        title: "Error",
-        description: "Something went wrong",
-        variant: "destructive",
+      toast.error("Something went wrong", {
         duration: 3000,
       });
-      utils.document.getDocData.setData(
-        { docId: docId as string },
-        ctx?.prevData,
-      );
+      utils.document.getDocData.setData({ docId: docId }, ctx?.prevData);
     },
     onSettled() {
       utils.document.getDocData.invalidate();
@@ -119,57 +178,6 @@ const DocViewer = ({
   });
 
   const { editor } = useBlocknoteEditorStore();
-
-  const addHighlightToNotes = (
-    content: string,
-    highlightId: string,
-    type: HighlightContentType,
-  ) => {
-    if (!editor) {
-      toast({
-        title: "Error",
-        description: "Something went wrong",
-        variant: "destructive",
-        duration: 3000,
-      });
-      return;
-    }
-
-    if (!canEdit) {
-      toast({
-        title: "Error",
-        description: "User can't edit this document",
-        variant: "destructive",
-        duration: 3000,
-      });
-      return;
-    }
-
-    if (type === HighlightContentType.TEXT) {
-      if (!content || !highlightId) return;
-
-      insertOrUpdateBlock(editor, {
-        content,
-        props: {
-          highlightId,
-        },
-        type: "highlight",
-      });
-    } else {
-      if (!content || !highlightId) return;
-
-      try {
-        insertOrUpdateBlock(editor, {
-          props: {
-            url: content,
-          },
-          type: "image",
-        });
-      } catch (err: any) {
-        console.log(err.message, "errnes");
-      }
-    }
-  };
 
   const utils = api.useContext();
 
@@ -183,23 +191,19 @@ const DocViewer = ({
     };
   }, []);
 
-  function getHighlightById(id: string): HighlightType | undefined {
-    return doc?.highlights?.find((highlight) => highlight.id === id);
-  }
-
-  async function addHighlight({ content, position }: AddHighlighType) {
+  async function addHighlight({ content, position }: AddHighlightType) {
     const highlightId = createId();
 
     if (!content.text && !content.image) return;
     const isTextHighlight = !content.image;
 
-    // todo check if user has edit/admin access
+    // todo check if user has edit/admin access => also dont render the highlight popover for them.
 
     addHighlightMutation({
       id: highlightId,
       boundingRect: position.boundingRect,
       type: isTextHighlight ? HighlightTypeEnum.TEXT : HighlightTypeEnum.IMAGE,
-      documentId: docId as string,
+      documentId: docId,
       pageNumber: position.pageNumber,
       rects: position.rects,
     });
@@ -208,7 +212,13 @@ const DocViewer = ({
       if (!content.text) return;
 
       // todo why is id being passed here?
-      addHighlightToNotes(content.text, highlightId, HighlightContentType.TEXT);
+      addHighlightToNotes(
+        content.text,
+        highlightId,
+        HighlightContentType.TEXT,
+        editor,
+        canEdit,
+      );
     } else {
       if (!content.image) return;
 
@@ -216,6 +226,8 @@ const DocViewer = ({
         content.image,
         highlightId,
         HighlightContentType.IMAGE,
+        editor,
+        canEdit,
       );
     }
   }
@@ -223,14 +235,10 @@ const DocViewer = ({
   const deleteHighlight = (id: string) => {
     // todo check if user has edit/admin access
     deleteHighlightMutation({
-      documentId: docId as string,
+      documentId: docId,
       highlightId: id,
     });
   };
-
-  // if (isError) {
-  //   return <>error</>;
-  // }
 
   if (!doc || !doc.highlights || !isReady) {
     return;
@@ -253,12 +261,9 @@ const DocViewer = ({
       </div>
       <div className="relative h-full w-full">
         <PdfReader
-          docId={docId as string}
           deleteHighlight={deleteHighlight}
-          docUrl={doc.url}
-          getHighlightById={getHighlightById}
+          doc={doc}
           addHighlight={addHighlight}
-          highlights={doc.highlights ?? []}
         />
       </div>
     </div>
