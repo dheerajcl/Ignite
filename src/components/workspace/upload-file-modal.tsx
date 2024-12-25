@@ -9,25 +9,44 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { toast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
+import { PLANS } from "@/lib/constants";
 import { useUploadThing } from "@/lib/uploadthing";
 import { cn } from "@/lib/utils";
 import { useDropzone } from "@uploadthing/react";
 import { XIcon } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useCallback, useState } from "react";
-import { generateClientDropzoneAccept } from "uploadthing/client";
+import { toast } from "sonner";
+import {
+  generateClientDropzoneAccept,
+  generatePermittedFileTypes,
+} from "uploadthing/client";
 import { z } from "zod";
+// @ts-ignore
+import scribe from "scribe.js-ocr";
 
 const UploadFileModal = ({
   refetchUserDocs,
+  docsCount,
 }: {
   refetchUserDocs: () => void;
+  docsCount: number;
 }) => {
+  const session = useSession();
+
+  const userPlan = (
+    session.data?.user?.plan ? PLANS[session.data?.user?.plan] : PLANS.FREE
+  ).maxPagesPerDoc;
+
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File>();
+  const [uploadProgress, setUploadProgress] = useState<number>();
+  const [doOcr, setDoOcr] = useState(false);
 
   const [open, setOpen] = useState(false);
+  const [isOcring, setIsOcring] = useState(false);
+
   const closeModal = () => setOpen(false);
 
   const onUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,30 +59,70 @@ const UploadFileModal = ({
 
   const {
     startUpload,
-    permittedFileInfo,
+    routeConfig,
     isUploading: isUploadthingUploading,
   } = useUploadThing("docUploader", {
+    onBeforeUploadBegin: async (files) => {
+      try {
+        const firstFile = files[0];
+        if (!files || files.length !== 1 || !firstFile) {
+          throw new Error("Please upload a single PDF file.");
+        }
+
+        if (doOcr) {
+          setIsOcring(true);
+          // await scribe.init({ pdf: true, ocr: true, font: true });
+          // const params = {
+          //   extractPDFTextNative: optGUI.extractText,
+          //   extractPDFTextOCR: optGUI.extractText,
+          // };
+          scribe.opt.displayMode = "invis";
+
+          await scribe.importFiles(
+            files,
+            // params
+          );
+          await scribe.recognize({
+            mode: "quality",
+            langs: ["eng"],
+            modeAdv: "combined",
+            vanillaMode: true,
+            combineMode: "data",
+          });
+
+          const data = (await scribe.exportData("pdf")) as string | ArrayBuffer;
+
+          const blob = new Blob([data], { type: "application/pdf" });
+          const file = new File([blob], firstFile.name, {
+            type: "application/pdf",
+          });
+
+          setIsOcring(false);
+          return [file];
+        }
+        return files;
+      } catch (err) {
+        setIsOcring(false);
+        throw new Error("Something went wrong while ocr-ing the file.");
+      }
+    },
     onClientUploadComplete: () => {
-      toast({
-        title: "Success",
-        description: "File uploaded successfully.",
-      });
+      toast.success("File uploaded successfully.");
     },
     onUploadError: () => {
-      toast({
-        title: "Error",
-        description: "error occurred while uploading",
-        variant: "destructive",
+      toast.error("Error occurred while uploading", {
+        duration: 3000,
       });
+    },
+    onUploadProgress: (p) => {
+      setUploadProgress(p);
     },
   });
 
   const uploadFile = async () => {
     if ((file && url) || (!file && !url)) {
-      toast({
-        title: "Error",
-        description: "Please upload a file or enter a URL.",
-        variant: "destructive",
+      toast.error("Please upload a file or enter a URL.", {
+        duration: 3000,
       });
       return;
     }
@@ -75,10 +134,8 @@ const UploadFileModal = ({
         try {
           urlSchema.parse(url);
         } catch (err) {
-          toast({
-            title: "Error",
-            description: "Invalid URL",
-            variant: "destructive",
+          toast.error("Invalid URL", {
+            duration: 3000,
           });
           return;
         }
@@ -86,10 +143,8 @@ const UploadFileModal = ({
         const res = await fetch(url);
         const contentType = res.headers.get("Content-Type");
         if (contentType !== "application/pdf") {
-          toast({
-            title: "Error",
-            description: "URL is not a PDF",
-            variant: "destructive",
+          toast.error("URL is not a PDF", {
+            duration: 3000,
           });
           return;
         }
@@ -103,9 +158,8 @@ const UploadFileModal = ({
           url,
         });
 
-        toast({
-          title: "Success",
-          description: "File uploaded successfully.",
+        toast.success("File uploaded successfully.", {
+          duration: 3000,
         });
       }
       closeModal();
@@ -114,32 +168,53 @@ const UploadFileModal = ({
       refetchUserDocs();
     } catch (err: any) {
       console.log("error", err.message);
-      toast({
-        title: "Error",
-        description: "Error occurred while uploading",
-        variant: "destructive",
-      });
+
+      toast.error(
+        "Error occurred while uploading. Please make sure the PDF is accessible.",
+        {
+          duration: 3000,
+        },
+      );
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={(o) => setOpen(o)}>
       <DialogTrigger>
-        <div className={cn(buttonVariants())}>Upload File</div>
+        <div
+          onClick={(e) => {
+            const userPlan = session?.data?.user?.plan;
+            if (!userPlan) return;
+            const allowedDocsCount = PLANS[userPlan].maxDocs;
+
+            if (docsCount >= allowedDocsCount) {
+              e.preventDefault();
+              toast.error("Free upload limit exceeded.", {
+                duration: 3000,
+                description: `Upgrade your plan to upload more than ${allowedDocsCount} document.`,
+              });
+              return;
+            }
+          }}
+          className={cn(buttonVariants())}
+        >
+          Upload File
+        </div>
       </DialogTrigger>
       <DialogContent hideClose={true}>
         <DialogHeader>
           <DialogTitle>
             <p className="text-xl">Upload File</p>
             <p className="text-sm font-normal text-gray-500">
-              Choose files under 6 pages to use AI, flashcard. (For now)
+              Choose files with {userPlan} or less pages to use AI features.
+              (For now)
             </p>
           </DialogTitle>
 
           <div className="mb-2" />
 
           <Uploader
-            permittedFileInfo={permittedFileInfo}
+            routeConfig={routeConfig}
             setUrl={setUrl}
             setFile={setFile}
             file={file}
@@ -154,7 +229,7 @@ const UploadFileModal = ({
           <div>
             <p>Import from URL</p>
             <p className="mb-2 text-xs font-normal text-gray-500">
-              Your files are not stored, only the URL is retained, also Supports
+              Your files are not stored, only the URL is retained, also supports
               Google Drive and Dropbox links.
             </p>
 
@@ -168,12 +243,16 @@ const UploadFileModal = ({
 
           <div>
             <div className="my-3 flex items-center space-x-2">
-              <Checkbox id="terms2" disabled />
+              <Checkbox
+                id="ocr"
+                checked={doOcr}
+                onCheckedChange={(c) => setDoOcr(!!c)}
+              />
               <label
-                htmlFor="terms2"
+                htmlFor="ocr"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
               >
-                OCR for scanned documents. (Coming soon)
+                OCR for scanned documents. (Beta - really slow 🐢)
               </label>
             </div>
           </div>
@@ -181,13 +260,28 @@ const UploadFileModal = ({
           <div>
             <Button
               disabled={
-                (!file && !url) || isUploadthingUploading || isUrlUploading
+                (!file && !url) ||
+                isUploadthingUploading ||
+                isUrlUploading ||
+                isOcring
               }
               className="mt-4 w-full"
               onClick={uploadFile}
             >
-              {(isUploadthingUploading || isUrlUploading) && <Spinner />}
-              Upload
+              {isUploadthingUploading || isUrlUploading || isOcring ? (
+                <>
+                  <Spinner />
+                  {isUploadthingUploading && (
+                    <p className="ml-2">{uploadProgress}%</p>
+                  )}
+
+                  {isOcring && (
+                    <span>Applying OCR, it might take a while...</span>
+                  )}
+                </>
+              ) : (
+                "Upload"
+              )}
             </Button>
           </div>
         </DialogHeader>
@@ -201,30 +295,28 @@ const Uploader = ({
   setUrl,
   setFile,
   file,
-  permittedFileInfo,
+  routeConfig,
 }: {
   setUrl: (url: string) => void;
   setFile: (file?: File) => void;
   file?: File;
-  permittedFileInfo: any;
+  routeConfig: any;
 }) => {
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (!acceptedFiles || acceptedFiles.length !== 1 || !acceptedFiles[0]) {
-      toast({
-        title: "Error",
-        description: "Please upload a single file.",
-        variant: "destructive",
-      });
-      return;
-    }
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      if (!acceptedFiles || acceptedFiles.length !== 1 || !acceptedFiles[0]) {
+        toast.error("Please upload a single PDF file.", {
+          duration: 3000,
+        });
 
-    setUrl("");
-    setFile(acceptedFiles[0]);
-  }, []);
+        return;
+      }
 
-  const fileTypes = permittedFileInfo?.config
-    ? Object.keys(permittedFileInfo?.config)
-    : [];
+      setUrl("");
+      setFile(acceptedFiles[0]);
+    },
+    [setFile, setUrl],
+  );
 
   const { getRootProps, getInputProps } = useDropzone({
     disabled: !!file,
@@ -232,7 +324,9 @@ const Uploader = ({
     maxFiles: 1,
     maxSize: 8 * 1024 * 1024,
     multiple: false,
-    accept: fileTypes ? generateClientDropzoneAccept(fileTypes) : undefined,
+    accept: generateClientDropzoneAccept(
+      generatePermittedFileTypes(routeConfig).fileTypes,
+    ),
   });
 
   return (

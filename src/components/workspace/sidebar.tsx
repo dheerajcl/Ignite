@@ -1,23 +1,22 @@
 import Chat from "@/components/chat";
-import Editor from "@/components/editor";
+import BlockNoteEditor from "@/components/editor";
 import Flashcards from "@/components/flashcard";
-import DragDrop from "@/components/Im";
-import Pedia from "@/components/Wiki";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Button } from "@/components/ui/button";
-import { SpinnerPage } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CustomTooltip } from "@/components/ui/tooltip";
 import { useBlocknoteEditorStore } from "@/lib/store";
-import { cn } from "@/lib/utils";
-import { ClientSideSuspense } from "@liveblocks/react";
 import { saveAs } from "file-saver";
-import { RoomProvider } from "liveblocks.config";
+import {
+  AlbumIcon,
+  BugIcon,
+  Download,
+  Layers,
+  MessagesSquareIcon,
+} from "lucide-react";
 import Link from "next/link";
-import { AlbumIcon, Download, Layers, MessagesSquareIcon, Image, Globe } from "lucide-react";
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useQueryState } from "nuqs";
+import { useMemo } from "react";
 import InviteCollab from "./invite-collab-modal";
 
 const TABS = [
@@ -39,43 +38,22 @@ const TABS = [
     icon: <Layers size={20} />,
     isNew: false,
   },
-  {
-    value: "new-feature", // Define a new tab value
-    tooltip: "Chat with Images", // Define a tooltip for the new tab
-    icon: <Image size={20} />, // Define an icon for the new tab
-    isNew: false,
-  },
-  {
-    value: "new-feature2", // Define a new tab value
-    tooltip: "Chat with Images", // Define a tooltip for the new tab
-    icon: <Globe size={20} />, // Define an icon for the new tab
-    isNew: false,
-  },
 ];
 
-// const ExploreButton = () => (
-//   <Button>
-//     <Link href="https://mu-llama.streamlit.app/" target="_blank">Explore more 🚀</Link>
-//   </Button>
-// );
-
-const tabNames = TABS.map((tab) => tab.value);
+const TAB_NAMES = TABS.map((tab) => tab.value);
+const DEFAULT_TAB_NAME = "notes";
 
 const Sidebar = ({
   canEdit,
-  username,
   isOwner,
   isVectorised,
+  note,
 }: {
   canEdit: boolean;
-  username: string;
   isOwner: boolean;
   isVectorised: boolean;
+  note: string | null;
 }) => {
-  const { query, push } = useRouter();
-  const documentId = query?.docId as string;
-  const tab = query.tab as string;
-
   const { editor } = useBlocknoteEditorStore();
 
   const handleDownloadMarkdownAsFile = async () => {
@@ -86,36 +64,41 @@ const Sidebar = ({
     saveAs(blob, "notes.md");
   };
 
-  const [activeIndex, setActiveIndex] = useState(
-    tab && tabNames.includes(tab) ? tab : "notes",
+  const TAB_CONTENTS = useMemo(
+    () => [
+      {
+        value: "notes",
+        tw: "flex-1 pb-0 break-words border-stone-200 bg-white sm:rounded-lg sm:border sm:shadow-lg h-full w-full overflow-auto",
+        children: <BlockNoteEditor canEdit={canEdit} note={note} />,
+      },
+      {
+        value: "chat",
+        tw: "p-2 pb-0 break-words border-stone-200 bg-white sm:rounded-lg sm:border sm:shadow-lg h-full w-full overflow-auto",
+        children: <Chat isVectorised={isVectorised} />,
+      },
+      {
+        value: "flashcards",
+        tw: "p-2 pb-0 break-words border-stone-200 bg-white sm:rounded-lg sm:border sm:shadow-lg h-full w-full overflow-auto",
+        children: <Flashcards />,
+      },
+    ],
+    [canEdit, isVectorised],
   );
 
-  useEffect(() => {
-    // update activeIndex when tab changes externally (using switchSidebarTabToChat fn)
-    if (tab && tabNames.includes(tab)) {
-      setActiveIndex(tab);
-    }
-  }, [tab]);
+  const [activeIndex, setActiveIndex] = useQueryState("tab", {
+    defaultValue: DEFAULT_TAB_NAME,
+    parse: (value) => (TAB_NAMES.includes(value) ? value : DEFAULT_TAB_NAME),
+  });
 
   return (
-    <div className="bg-gray-50">
+    <div className="bg-gray-50 h-full">
       <Tabs
         value={activeIndex}
         onValueChange={(value) => {
           setActiveIndex(value);
-          push(
-            {
-              query: {
-                ...query,
-                tab: value,
-              },
-            },
-            undefined,
-            { shallow: true },
-          );
         }}
         defaultValue="notes"
-        className="max-h-screen max-w-full overflow-hidden"
+        className="max-hd-screen flex flex-col max-w-full overflow-hidden h-full"
       >
         <div className="flex items-center justify-between pr-1">
           <TabsList className="h-12 rounded-md bg-gray-200">
@@ -133,71 +116,40 @@ const Sidebar = ({
                 </TabsTrigger>
               </CustomTooltip>
             ))}
-            <div className="p-2">
-            </div>
           </TabsList>
           <div className="flex items-center gap-1">
-            {isOwner && <InviteCollab />}
+            {isOwner && (
+              <CustomTooltip content="Invite collaborators">
+                <InviteCollab />
+              </CustomTooltip>
+            )}
 
-            <div
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" }),
-                "ml-auto cursor-pointer border-stone-200 bg-white px-2 text-xs shadow-sm sm:border",
-              )}
-              onClick={handleDownloadMarkdownAsFile}
-            >
-              <Download size={20} />
-            </div>
+            <CustomTooltip content="Download notes as markdown">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-auto cursor-pointer border-stone-200 bg-white px-2 text-xs shadow-sm sm:border"
+                onClick={handleDownloadMarkdownAsFile}
+              >
+                <Download size={20} />
+              </Button>
+            </CustomTooltip>
+
+            <CustomTooltip content="Report bug">
+              <Link href="/feedback">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto cursor-pointer border-stone-200 bg-white px-2 text-xs shadow-sm sm:border"
+                >
+                  <BugIcon size={20} />
+                </Button>
+              </Link>
+            </CustomTooltip>
           </div>
         </div>
 
-        {[
-          {
-            value: "notes",
-            tw: "flex-1 overflow-scroll border-stone-200 bg-white sm:rounded-lg sm:border sm:shadow-lg h-[calc(100vh-3.5rem)] w-full overflow-scroll",
-            children: (
-              <RoomProvider
-                id={`doc-${documentId}`}
-                initialPresence={
-                  {
-                    // TODO: figure out what this is
-                    // name: "User",
-                    // color: "red",
-                  }
-                }
-              >
-                <ClientSideSuspense fallback={<SpinnerPage />}>
-                  {() => (
-                    <Editor
-                      canEdit={canEdit ?? false}
-                      username={username ?? "User"}
-                    />
-                  )}
-                </ClientSideSuspense>
-              </RoomProvider>
-            ),
-          },
-          {
-            value: "chat",
-            tw: " p-2 pb-0 break-words border-stone-200 bg-white sm:rounded-lg sm:border sm:shadow-lg h-[calc(100vh-3.5rem)] w-full overflow-scroll ",
-            children: <Chat isVectorised={isVectorised} />,
-          },
-          {
-            value: "flashcards",
-            tw: " p-2 pb-0 break-words border-stone-200 bg-white sm:rounded-lg sm:border sm:shadow-lg h-[calc(100vh-3.5rem)] w-full overflow-scroll ",
-            children: <Flashcards />,
-          },
-          {
-            value: "new-feature",
-            tw: "p-2 pb-0 break-words border-stone-200 bg-white sm:rounded-lg sm:border sm:shadow-lg h/[calc(100vh-3.5rem)] w/full overflow-scroll",
-            children: <DragDrop />
-          },
-          {
-            value: "new-feature2",
-            tw: "p-2 pb-0 break-words border-stone-200 bg-white sm:rounded-lg sm:border sm:shadow-lg h/[calc(100vh-3.5rem)] w/full overflow-scroll",
-            children: <Pedia />
-          },
-        ].map((item) => (
+        {TAB_CONTENTS.map((item) => (
           <TabsContent
             key={item.value}
             forceMount
