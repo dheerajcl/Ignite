@@ -1,21 +1,21 @@
 import FeatureCard from "@/components/other/feature-card";
 import BouncingLoader from "@/components/ui/bouncing-loader";
 import { SpinnerCentered } from "@/components/ui/spinner";
-import { toast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import { useChatStore } from "@/lib/store";
 import { cn } from "@/lib/utils";
 import { useChat } from "ai/react";
-import { BanIcon, Send } from "lucide-react";
+import { ArrowUp, BanIcon } from "lucide-react";
 import { useRouter } from "next/router";
 import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import TextareaAutosize from "react-textarea-autosize";
+import { toast } from "sonner";
 
 export default function Chat({ isVectorised }: { isVectorised: boolean }) {
   const { query } = useRouter();
 
-  const docId = query?.docId;
+  const docId = query?.docId as string;
 
   const {
     messages,
@@ -28,14 +28,11 @@ export default function Chat({ isVectorised }: { isVectorised: boolean }) {
     append,
   } = useChat({
     body: {
-      docId: docId as string,
+      docId,
     },
-
+    maxSteps: 2,
     onError: (err: any) => {
-      toast({
-        title: "Error",
-        description: error?.message ?? "Something went wrong",
-        variant: "destructive",
+      toast.error(err?.message, {
         duration: 3000,
       });
     },
@@ -59,7 +56,7 @@ export default function Chat({ isVectorised }: { isVectorised: boolean }) {
   const { data: prevChatMessages, isLoading: isChatsLoading } =
     api.message.getAllByDocId.useQuery(
       {
-        docId: docId as string,
+        docId: docId,
       },
       {
         refetchOnWindowFocus: false,
@@ -78,16 +75,13 @@ export default function Chat({ isVectorised }: { isVectorised: boolean }) {
   const { mutate: vectoriseDocMutation, isLoading: isVectorising } =
     api.document.vectorise.useMutation({
       onSuccess: () => {
-        utils.document.getDocData.setData(
-          { docId: docId as string },
-          (prev) => {
-            if (!prev) return undefined;
-            return {
-              ...prev,
-              isVectorised: true,
-            };
-          },
-        );
+        utils.document.getDocData.setData({ docId }, (prev) => {
+          if (!prev) return undefined;
+          return {
+            ...prev,
+            isVectorised: true,
+          };
+        });
       },
     });
 
@@ -104,13 +98,10 @@ export default function Chat({ isVectorised }: { isVectorised: boolean }) {
         ]}
         onClick={() => {
           vectoriseDocMutation(
-            { documentId: docId as string },
+            { documentId: docId },
             {
               onError: (err: any) => {
-                toast({
-                  title: "Uh-oh",
-                  description: err?.message ?? "Something went wrong",
-                  variant: "destructive",
+                toast.error(err?.message, {
                   duration: 3000,
                 });
               },
@@ -129,7 +120,7 @@ export default function Chat({ isVectorised }: { isVectorised: boolean }) {
   }
 
   return (
-    <div className="flex h-full w-full flex-col gap-2 overflow-hidden">
+    <div className="flex h-full w-full flex-col gap-1 overflow-hidden md:gap-2">
       <div
         className="hideScrollbar flex flex-1 flex-col gap-3 overflow-auto"
         ref={messageWindowRef}
@@ -138,12 +129,11 @@ export default function Chat({ isVectorised }: { isVectorised: boolean }) {
           {
             id: "id",
             content:
-              "Welcome to **Ignite**! I'm here to assist you. Feel free to ask questions or discuss topics based on the data provided. Whether it's clarifying information, diving deeper into a subject, or exploring related topics, I'm ready to help. Let's make the most out of your learning!",
+              "Welcome to **Uxie**! I'm here to assist you. Feel free to ask questions or discuss topics based on the data provided. Whether it's clarifying information, diving deeper into a subject, or exploring related topics, I'm ready to help. Let's make the most out of your learning!",
 
             role: "assistant",
           },
           ...(prevChatMessages ?? []),
-
           ...messages,
         ].map((m) => (
           <div
@@ -154,20 +144,26 @@ export default function Chat({ isVectorised }: { isVectorised: boolean }) {
               "max-w-[80%] text-left ",
             )}
           >
-            <ReactMarkdown
-              className={cn(
-                m.role === "user" &&
-                  "prose-invert bg-blue-500 text-gray-50 prose-code:text-gray-100",
-                m.role === "assistant" && "bg-gray-100 ",
-                "prose rounded-xl px-3 py-1 prose-ul:pl-2 prose-li:px-2",
-              )}
-            >
-              {m.content}
-            </ReactMarkdown>
+            {m.content.length > 0 ? (
+              <ReactMarkdown
+                className={cn(
+                  m.role === "user" &&
+                    "prose-invert bg-blue-500 text-gray-50 prose-code:text-gray-100",
+                  m.role === "assistant" && "bg-gray-100 ",
+                  "prose rounded-xl px-3 py-1 prose-ul:pl-2 prose-li:px-2",
+                )}
+              >
+                {m.content}
+              </ReactMarkdown>
+            ) : (
+              <span className="text-gray-500 italic text-sm">
+                Searching the PDF for relevant information
+              </span>
+            )}
           </div>
         ))}
 
-        {isLoading && messages.at(-1)?.role === "user" && (
+        {isLoading && (
           <div
             className={cn(
               "mr-auto bg-gray-100 text-black",
@@ -179,17 +175,16 @@ export default function Chat({ isVectorised }: { isVectorised: boolean }) {
         )}
       </div>
 
-      <form onSubmit={handleSubmit}>
-        <div className="mb-2 mt-1 flex w-full ">
+      <form onSubmit={handleSubmit} className="mx-[2px] mb-1">
+        <div className="flex w-full border border-gray-300 rounded-md focus-within:ring-blue-500 focus-within:ring-2">
           <TextareaAutosize
             maxLength={1000}
-            placeholder="Enter your question (max 1,000 characters)"
-            className="flex-1 resize-none rounded-md border border-gray-300 px-3 py-2 font-normal"
+            placeholder="Type your question here..."
+            className="resize-none rounded-lg px-3 py-2 font-normal active:ring-0 focus-visible:ring-0 focus:ring-0 focus:outline-none w-full"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !isLoading) {
                 e.preventDefault();
-                // @ts-ignore
-                handleSubmit(e);
+                handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>);
               } else if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
               }
@@ -199,21 +194,23 @@ export default function Chat({ isVectorised }: { isVectorised: boolean }) {
             autoFocus
             maxRows={4}
           />
-          {isLoading ? (
-            <button className="w-fit px-2">
-              <BanIcon size={24} className="text-gray-500" onClick={stop} />
-            </button>
-          ) : (
-            <button
-              className="group w-fit rounded-ee-md rounded-se-md px-2"
-              type="submit"
-            >
-              <Send
+          <button
+            className="group w-fit px-2 bg-gray-100 rounded-md m-[2px]"
+            type={isLoading ? "button" : "submit"}
+          >
+            {isLoading ? (
+              <BanIcon
                 size={24}
-                className=" text-gray-600 group-hover:text-gray-700"
+                className="text-gray-500 group-hover:text-gray-700"
+                onClick={stop}
               />
-            </button>
-          )}
+            ) : (
+              <ArrowUp
+                size={24}
+                className="text-gray-500 group-hover:text-gray-700"
+              />
+            )}
+          </button>
         </div>
       </form>
     </div>
