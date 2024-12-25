@@ -21,7 +21,7 @@ const SlideUpWhenVisible: React.FC<SlideUpWhenVisibleProps> = ({
   }, [controls, inView]);
   return (
     <motion.div
-      ref={ref}
+      ref={ref as any}
       animate={controls}
       initial="hidden"
       transition={{ duration: 0.4 }}

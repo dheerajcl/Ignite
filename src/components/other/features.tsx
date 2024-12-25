@@ -6,15 +6,16 @@ import { useEffect, useRef } from "react";
 
 const features = [
   {
-    title: "Annotate your notes w. ease",
+    title: "Annotate your documents w. ease",
     imageUrl: "/features/annotation.gif",
     description:
-      "To create area highlight hold ⌥ Option key (Alt), then click and drag.",
+      "With text and area highlights (hold ⌥ Option key (Alt), then click and drag), and text-to-speech support",
   },
   {
     title: "Take notes with a notion like editor",
     imageUrl: "/features/editor.gif",
-    description: "With export to Markdown.",
+    description:
+      "With AI text autocompletion, text enhancement, and export to Markdown.",
   },
   {
     title: "Ask the chatbot anything pdf related",
@@ -29,11 +30,6 @@ const features = [
     title: "Collaborate with your team",
     imageUrl: "/features/collab.gif",
     description: "With real-time updates.",
-  },
-  {
-    title: "AI-powered autocompletion",
-    imageUrl: "/features/completion.gif",
-    description: "Add '++' to the end of a sentence to autocomplete.",
   },
 ];
 
@@ -56,7 +52,7 @@ function Features() {
                 ))}
               </ul>
             </div>
-            <div className="sticky top-0 hidden h-screen w-full items-center md:flex">
+            <div className="sticky top-0 hidden hd-screen w-full items-center md:flex">
               <FeatureImage />
             </div>
           </div>
@@ -69,20 +65,14 @@ function Features() {
 const FeatureImage = () => {
   const inViewFeature = useFeatureStore((state) => state.inViewFeature);
 
-  const invalidFeature =
-    typeof inViewFeature !== "number" ||
-    !features[inViewFeature] ||
-    !features[inViewFeature]?.imageUrl ||
-    typeof features[inViewFeature]?.imageUrl !== "string";
+  const curFeature = inViewFeature !== null ? features[inViewFeature] : null;
 
   return (
     <div className="relative aspect-video h-[25%] w-full rounded-2xl bg-gray-100 lg:h-[40%] [&:has(>_.active-card)]:bg-transparent">
-      {!invalidFeature && (
+      {curFeature && (
         <Image
           alt="feature"
-          // throwing error for some reason ugh
-          // @ts-ignore
-          src={features[inViewFeature].imageUrl}
+          src={curFeature.imageUrl}
           width={800}
           height={450}
           className="h-full w-full rounded-md"

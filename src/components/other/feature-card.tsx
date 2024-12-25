@@ -27,7 +27,7 @@ const FeatureCard = ({
         ))}
       </ul>
 
-      <Button className="mt-0 md:mt-0" disabled={isLoading} onClick={onClick}>
+      <Button className="mt-4 md:mt-6" disabled={isLoading} onClick={onClick}>
         {isLoading && <Spinner />}
         {buttonText}
       </Button>
