@@ -16,7 +16,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { toast } from "@/components/ui/use-toast";
 import { api } from "@/lib/api";
 import {
   FEEDBACK_FORM_DEFAULT_VALUES,
@@ -25,7 +24,8 @@ import {
 } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import * as z from "zod";
+import { toast } from "sonner";
+import { z } from "zod";
 
 const Feedback = () => {
   const { mutateAsync: submitFeedbackMutation, isLoading } =
@@ -38,10 +38,9 @@ const Feedback = () => {
 
   const onSubmit = async () => {
     await submitFeedbackMutation(form.getValues());
-    toast({
-      title: "Feedback submitted!",
-      description: "Thank you for sharing your thoughts with us 🥳",
-    });
+    toast.success(
+      "Feedback submitted! Thank you for sharing your thoughts with us 🥳",
+    );
 
     form.reset();
   };

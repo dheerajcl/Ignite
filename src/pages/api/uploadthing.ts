@@ -1,8 +1,11 @@
-import { createNextPageApiHandler } from "uploadthing/next-legacy";
-
 import { docUploader } from "@/server/uploadthing";
+import { createRouteHandler } from "uploadthing/next-legacy";
 
-const handler = createNextPageApiHandler({
+export const config = {
+  maxDuration: 30,
+};
+
+const handler = createRouteHandler({
   router: docUploader,
 });
 

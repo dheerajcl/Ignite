@@ -1,17 +1,14 @@
 import Navbar from "@/components/navbar";
-import { Toaster } from "@/components/ui/toaster";
+import { Toaster } from "@/components/ui/sonner";
 import { api } from "@/lib/api";
 import "@/styles/globals.css";
-import "@blocknote/react/style.css";
+import "@blocknote/mantine/style.css";
 import { type Session } from "next-auth";
 import { SessionProvider } from "next-auth/react";
 import { DefaultSeo } from "next-seo";
 import { type AppType } from "next/app";
 import { useRouter } from "next/router";
 import { SEO } from "../../next-seo.config";
-import { Analytics } from '@vercel/analytics/react';
-import { SpeedInsights } from '@vercel/speed-insights/next';
-
 
 const MyApp: AppType<{ session: Session | null }> = ({
   Component,
@@ -33,8 +30,6 @@ const MyApp: AppType<{ session: Session | null }> = ({
         </main>
       )}
       <Toaster />
-      <Analytics />
-      <SpeedInsights />
     </SessionProvider>
   );
 };
