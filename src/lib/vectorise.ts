@@ -34,7 +34,7 @@ export const vectoriseDocument = async (
     }
 
     const pinecone = getPineconeClient();
-    const pineconeIndex = pinecone.Index("uxie");
+    const pineconeIndex = pinecone.Index("ignitev2");
 
     const textSplitter = new RecursiveCharacterTextSplitter({
       chunkSize: 1000,
@@ -84,7 +84,7 @@ export const retrieveRelevantDocumentContent = async (
   });
 
   const pinecone = getPineconeClient();
-  const pineconeIndex = pinecone.Index("uxie");
+  const pineconeIndex = pinecone.Index("ignitev2");
 
   const vectorStore = await PineconeStore.fromExistingIndex(embeddings, {
     pineconeIndex,
