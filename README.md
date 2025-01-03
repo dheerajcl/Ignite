@@ -9,7 +9,7 @@
 - Zod For validation
 - Typescript For type safety
 - Tailwind CSS For CSS
-- React Query for data fetching
+- React Query for data fetching, optimistic updates
 - React Hook Form for form handling
 - Shadcn UI + Radix UI For UI components
 - Supabase As the database
@@ -23,6 +23,7 @@
 - Fireworks AI for LLM
 - Huggingface Model for generating Embeddings
 - Liveblocks for realtime collaboration
+- Nuqs for type-safe search params
 
 
 
