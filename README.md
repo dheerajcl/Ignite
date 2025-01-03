@@ -54,13 +54,17 @@
 
 DATABASE_URL=postgres://postgres.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.supabase.com:5432/postgres     #visit Supabase
 
+PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxxxxxxxxxxxx.supabase.co
+
+SUPABASE_SERVICE_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
 NEXTAUTH_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 NEXTAUTH_URL=http://localhost:3000    #or  url
 
 GOOGLE_CLIENT_ID=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 GOOGLE_CLIENT_SECRET=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
-NODE_ENV=development
+NODE_ENV=development/production 
 
 UPLOADTHING_SECRET=sk_live_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXx
 UPLOADTHING_APP_ID=XXXXXXXXXX
