@@ -102,10 +102,8 @@ Run `npm install` or `pnpm install` or `yarn` to install your node_modules
 Now app is fully configured 👍 and you can start using this app using either one of `npm run dev` or `yarn dev` or `pnpm dev`.
 
 
-And make sure to push your db to prisma `npx prisma db push` before starting.
+And make sure to generate `npx prisma generate` and push your db to prisma `npx prisma db push` before starting.
 
-
-**NOTE:** Please make sure to keep your API keys and configuration values secure and do not expose them publicly.
 
 
 
